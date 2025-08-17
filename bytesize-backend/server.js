@@ -6,7 +6,8 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: true })); // later restrict to your GitHub Pages URL
+app.use(cors({ origin: "http://localhost:5173" })); // only allow frontend dev server
+
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY;
 const HF_API_KEY = process.env.HF_API_KEY;
@@ -29,11 +30,13 @@ app.get("/news", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch news" });
   }
 });
-
-// Summarize endpoint
 app.post("/summarize", async (req, res) => {
   try {
     const articleText = req.body.text || "";
+    
+    // ✅ Correct place to log
+    console.log("Text received for summarization:", articleText.length, articleText);
+
     const response = await fetch(
       "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
       {
@@ -45,6 +48,7 @@ app.post("/summarize", async (req, res) => {
         body: JSON.stringify({ inputs: articleText }),
       }
     );
+
     const data = await response.json();
 
     const summary =
@@ -58,6 +62,8 @@ app.post("/summarize", async (req, res) => {
     res.status(500).json({ error: "Failed to summarize" });
   }
 });
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
