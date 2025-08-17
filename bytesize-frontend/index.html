@@ -318,73 +318,45 @@
         <h2 class="modal-title">Article Summary</h2>
         <button class="modal-close" id="close-modal">&times;</button>
       </div>
-      <div class="modal-body" id="modal-body">
-        <!-- Summary content will be inserted here -->
-      </div>
+      <div class="modal-body" id="modal-body"></div>
     </div>
   </div>
 
   <script>
-    const HF_API_KEY = "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"; // ← REPLACE this with your actual token
+    // 👉 IMPORTANT: point this to your deployed backend on Render
+    const BACKEND_BASE = "http://localhost:5000";  
+    // when deployed, change to: 
+    // const BACKEND_BASE = "https://your-backend.onrender.com";
 
-    async function summarizeTextWithHF(text) {
-      try {
-        const response = await fetch(
-          "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${HF_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ inputs: text }),
-          }
-        );
-
-        const data = await response.json();
-        return data[0]?.summary_text || "No summary available.";
-      } catch (err) {
-        console.error("Summarization error:", err);
-        return "Failed to summarize the article.";
-      }
-    }
-
-    const API_KEY = "6496a3ef601942188ab370d42ced5a9a"; // Replace with your key
     const newsContainer = document.getElementById("news-container");
     const modal = document.getElementById("summary-modal");
     const modalBody = document.getElementById("modal-body");
     const closeModal = document.getElementById("close-modal");
 
-    // Modal functionality
+    // Modal functions
     function showModal(content) {
       modalBody.innerHTML = content;
-      modal.classList.add('active');
-      document.body.style.overflow = 'hidden';
+      modal.classList.add("active");
+      document.body.style.overflow = "hidden";
     }
-
     function hideModal() {
-      modal.classList.remove('active');
-      document.body.style.overflow = 'auto';
+      modal.classList.remove("active");
+      document.body.style.overflow = "auto";
     }
-
-    closeModal.addEventListener('click', hideModal);
-    modal.addEventListener('click', (e) => {
+    closeModal.addEventListener("click", hideModal);
+    modal.addEventListener("click", (e) => {
       if (e.target === modal) hideModal();
     });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') hideModal();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideModal();
     });
 
+    // 🔹 Fetch news via backend
     async function fetchNews() {
       newsContainer.innerHTML = '<div class="loading">Loading latest news...</div>';
-      
       try {
-        const response = await fetch(
-          `https://newsapi.org/v2/top-headlines?country=us&apiKey=${API_KEY}`
-        );
+        const response = await fetch(`${BACKEND_BASE}/news`);
         const data = await response.json();
-        
         if (data.articles && data.articles.length > 0) {
           displayNews(data.articles);
         } else {
@@ -396,19 +368,36 @@
       }
     }
 
+    // 🔹 Summarize via backend
+    async function summarizeTextWithHF(text) {
+      try {
+        const response = await fetch(`${BACKEND_BASE}/summarize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const data = await response.json();
+        return data.summary_text || "No summary available.";
+      } catch (err) {
+        console.error("Summarization error:", err);
+        return "Failed to summarize the article.";
+      }
+    }
+
+    // Display articles
     function displayNews(articles) {
       newsContainer.innerHTML = '<div class="news-grid"></div>';
-      const newsGrid = newsContainer.querySelector('.news-grid');
+      const newsGrid = newsContainer.querySelector(".news-grid");
 
       articles.forEach((article, index) => {
         const newsCard = document.createElement("div");
         newsCard.className = "news-card";
         newsCard.style.animationDelay = `${index * 0.1}s`;
-        
-        const truncatedDescription = article.description 
-          ? (article.description.length > 150 
-             ? article.description.substring(0, 150) + '...' 
-             : article.description)
+
+        const truncatedDescription = article.description
+          ? (article.description.length > 150
+              ? article.description.substring(0, 150) + "..."
+              : article.description)
           : "No description available.";
 
         newsCard.innerHTML = `
@@ -421,17 +410,17 @@
             <button class="btn btn-secondary" onclick="saveFavorite(\`${encodeURIComponent(article.title)}\`, \`${encodeURIComponent(article.description || "")}\`)">
               ⭐ Save
             </button>
-            ${article.url ? `<button class="btn" onclick="window.open('${article.url}', '_blank')" style="background: #6c757d;">🔗 Read Full</button>` : ''}
+            ${article.url ? `<button class="btn" onclick="window.open('${article.url}', '_blank')" style="background: #6c757d;">🔗 Read Full</button>` : ""}
           </div>
         `;
         newsGrid.appendChild(newsCard);
       });
     }
 
+    // Summarize handler
     async function summarize(encodedArticleText) {
       const articleText = decodeURIComponent(encodedArticleText);
       showModal('<div class="loading">Generating summary...</div>');
-      
       try {
         const summary = await summarizeTextWithHF(articleText);
         showModal(`<p>${summary}</p>`);
@@ -440,30 +429,23 @@
       }
     }
 
+    // Save favorites in memory
     function saveFavorite(encodedTitle, encodedDescription) {
       const title = decodeURIComponent(encodedTitle);
       const description = decodeURIComponent(encodedDescription);
-      
-      // Store in memory instead of localStorage for Claude.ai compatibility
-      if (!window.favorites) {
-        window.favorites = [];
-      }
-      
-      // Check if already saved
+      if (!window.favorites) window.favorites = [];
       const exists = window.favorites.some(fav => fav.title === title);
       if (exists) {
         showModal('<p style="color: #ffc107;">This article is already in your favorites!</p>');
         return;
       }
-      
       window.favorites.push({ title, description });
       showModal('<p style="color: #28a745;">✅ Saved to favorites!</p>');
     }
 
-    // View Favorites
+    // View favorites
     document.getElementById("view-favorites").addEventListener("click", () => {
       const favorites = window.favorites || [];
-      
       if (favorites.length === 0) {
         newsContainer.innerHTML = `
           <div class="error-message">
@@ -473,15 +455,12 @@
         `;
         return;
       }
-
       newsContainer.innerHTML = '<div class="news-grid"></div>';
-      const newsGrid = newsContainer.querySelector('.news-grid');
-      
-      // Add header
-      const header = document.createElement('div');
-      header.style.gridColumn = '1 / -1';
-      header.style.textAlign = 'center';
-      header.style.marginBottom = '20px';
+      const newsGrid = newsContainer.querySelector(".news-grid");
+      const header = document.createElement("div");
+      header.style.gridColumn = "1 / -1";
+      header.style.textAlign = "center";
+      header.style.marginBottom = "20px";
       header.innerHTML = '<h2 style="color: white; font-size: 2rem;">Your Favorite Articles</h2>';
       newsGrid.appendChild(header);
 
@@ -502,10 +481,10 @@
       });
     });
 
-    // Refresh News
+    // Refresh button
     document.getElementById("refresh-news").addEventListener("click", fetchNews);
 
-    // Load news on startup
+    // Load on startup
     fetchNews();
   </script>
 </body>
